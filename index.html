@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Image Collage</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r126/three.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background-color: white; overflow: hidden; font-family: 'Roboto Mono', monospace; }
+        canvas { display: block; }
+        .controls {
+            position: fixed;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px;
+            font-size: 12px;
+            border-radius: 5px;
+            display: flex;
+            gap: 10px;
+        }
+        .control-button {
+            background: #333;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .control-button:hover { background: #555; }
+        .image-label {
+            position: absolute;
+            font-size: 14px;
+            color: green;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <button class="control-button" onclick="loadImages('Y1S1')">Y1S1 (1)</button>
+        <button class="control-button" onclick="loadImages('Y2S1')">Y2S1 (2)</button>
+        <button class="control-button" onclick="loadImages('Y3S1')">Y3S1 (3)</button>
+        <button class="control-button" onclick="loadImages('Y4S1')">Y4S1 (4)</button>
+        <button class="control-button" onclick="moving = !moving">Move/Stop (X)</button>
+        <button class="control-button" onclick="loadImages()">Random (R)</button>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
