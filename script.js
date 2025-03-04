@@ -46,15 +46,41 @@ async function fetchImages() {
     } catch (error) {
         console.error('Error loading image list:', error);
     }
+function fadeOutImages(callback) {
+    let opacity = 1;
+    let interval = setInterval(() => {
+        opacity -= 0.1;
+        imagePlanes.forEach(plane => {
+            if (plane.material) plane.material.opacity = opacity;
+        });
+        if (opacity <= 0) {
+            clearInterval(interval);
+            callback();
+        }
+    }, 50);
 }
 
-// ✅ Load Random Images from the List
+function fadeInImages() {
+    let opacity = 0;
+    let interval = setInterval(() => {
+        opacity += 0.1;
+        imagePlanes.forEach(plane => {
+            if (plane.material) plane.material.opacity = opacity;
+        });
+        if (opacity >= 1) {
+            clearInterval(interval);
+        }
+    }, 50);
+}
+
 function loadImages() {
-    clearScene();
-    let shuffledImages = totalImages.sort(() => 0.5 - Math.random()).slice(0, maxImages);
-    displayImages(shuffledImages);
+    fadeOutImages(() => {
+        clearScene();
+        let shuffledImages = totalImages.sort(() => 0.5 - Math.random()).slice(0, maxImages);
+        displayImages(shuffledImages);
+        fadeInImages();
+    });
 }
-
 // ✅ Display Images with Labels
 function displayImages(imageList) {
     clearScene();
@@ -122,7 +148,6 @@ function clearScene() {
     movementAngles = [];
 }
 
-// ✅ Animation Function
 function animate() {
     requestAnimationFrame(animate);
 
@@ -136,6 +161,12 @@ function animate() {
             if (movingY) {
                 plane.position.y += Math.sin(angle) * movementSpeed * directionY;
             }
+
+            // Wrap around edges
+            if (plane.position.x > window.innerWidth / 2) plane.position.x = -window.innerWidth / 2;
+            if (plane.position.x < -window.innerWidth / 2) plane.position.x = window.innerWidth / 2;
+            if (plane.position.y > window.innerHeight / 2) plane.position.y = -window.innerHeight / 2;
+            if (plane.position.y < -window.innerHeight / 2) plane.position.y = window.innerHeight / 2;
         });
 
         updateLabels();
@@ -143,6 +174,7 @@ function animate() {
 
     renderer.render(scene, camera);
 }
+
 
 // ✅ Keyboard Controls
 window.addEventListener('keydown', (event) => {
