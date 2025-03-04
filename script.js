@@ -189,9 +189,21 @@ function animate() {
 
         updateLabels();
     }
+   
+    function toggleMovement() {
+    if (!movingX && !movingY) {
+        movingX = true;
+    } else if (movingX) {
+        movingX = false;
+        movingY = true;
+    } else {
+        movingY = false;
+    }
+}
 
     renderer.render(scene, camera);
 }
+
 
 // ✅ Keyboard Controls for Filtering
 window.addEventListener('keydown', (event) => {
