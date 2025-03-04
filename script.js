@@ -46,6 +46,9 @@ async function fetchImages() {
     } catch (error) {
         console.error('Error loading image list:', error);
     }
+} // ✅ FIX: Closing bracket added here!
+
+// ✅ Fade Out Images
 function fadeOutImages(callback) {
     let opacity = 1;
     let interval = setInterval(() => {
@@ -60,6 +63,7 @@ function fadeOutImages(callback) {
     }, 50);
 }
 
+// ✅ Fade In Images
 function fadeInImages() {
     let opacity = 0;
     let interval = setInterval(() => {
@@ -73,14 +77,27 @@ function fadeInImages() {
     }, 50);
 }
 
-function loadImages() {
+// ✅ Load Images with Optional Filtering
+function loadImages(category = '') {
     fadeOutImages(() => {
         clearScene();
-        let shuffledImages = totalImages.sort(() => 0.5 - Math.random()).slice(0, maxImages);
+
+        // ✅ Filter images based on category
+        let filteredImages = category
+            ? totalImages.filter(filename => filename.includes(category))
+            : totalImages;
+
+        if (filteredImages.length === 0) {
+            console.warn('No images found for category:', category);
+            return;
+        }
+
+        let shuffledImages = filteredImages.sort(() => 0.5 - Math.random()).slice(0, maxImages);
         displayImages(shuffledImages);
         fadeInImages();
     });
 }
+
 // ✅ Display Images with Labels
 function displayImages(imageList) {
     clearScene();
@@ -148,6 +165,7 @@ function clearScene() {
     movementAngles = [];
 }
 
+// ✅ Animation Function
 function animate() {
     requestAnimationFrame(animate);
 
@@ -175,22 +193,16 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-
-// ✅ Keyboard Controls
+// ✅ Keyboard Controls for Filtering
 window.addEventListener('keydown', (event) => {
     switch (event.key) {
-        case 'x': // 🔥 Toggle movement modes
-            if (!movingX && !movingY) {
-                movingX = true;
-            } else if (movingX) {
-                movingX = false;
-                movingY = true;
-            } else {
-                movingY = false;
-            }
-            break;
+        case '1': loadImages('Y1S1'); break;
+        case '2': loadImages('Y2S1'); break;
+        case '3': loadImages('Y3S1'); break;
+        case '4': loadImages('Y4S1'); break;
         case 'r': loadImages(); break; // 🔥 Randomize images
         case 'b': location.reload(); break; // 🔥 Restart
+        case 'x': movingX = !movingX; movingY = false; break; // 🔥 Toggle movement modes
     }
 });
 
