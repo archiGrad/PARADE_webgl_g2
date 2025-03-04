@@ -46,7 +46,7 @@ async function fetchImages() {
     } catch (error) {
         console.error('Error loading image list:', error);
     }
-} // ✅ FIX: Closing bracket added here!
+}
 
 // ✅ Fade Out Images
 function fadeOutImages(callback) {
@@ -101,6 +101,8 @@ function loadImages(category = '') {
 // ✅ Display Images with Labels
 function displayImages(imageList) {
     clearScene();
+    movementAngles = []; // Reset movement angles
+
     imageList.forEach((filename) => {
         let imagePath = imagesPath + filename;
         let texture = textureLoader.load(imagePath);
@@ -118,11 +120,11 @@ function displayImages(imageList) {
         let y = (Math.random() * window.innerHeight) - window.innerHeight / 2;
         plane.position.set(x, y, 0);
 
-        let angle = Math.random() * Math.PI * 2; // 🔥 Randomize movement angles
+        let angle = Math.random() * Math.PI * 2; // 🔥 Random movement angle
         movementAngles.push({
             angle,
-            directionX: Math.random() > 0.5 ? 1 : -1, // 🔥 Random direction
-            directionY: Math.random() > 0.5 ? 1 : -1  // 🔥 Random direction
+            directionX: Math.random() > 0.5 ? 1 : -1, // 🔥 Random direction X
+            directionY: Math.random() > 0.5 ? 1 : -1  // 🔥 Random direction Y
         });
 
         scene.add(plane);
@@ -152,7 +154,7 @@ function updateLabels() {
 
         element.style.left = `${x}px`;
         element.style.top = `${y}px`;
-        element.style.transform = "translate(-50%, 20px)"; // 🔥 Adjusted to appear below image
+        element.style.transform = "translate(-50%, 20px)";
     });
 }
 
@@ -162,7 +164,6 @@ function clearScene() {
     labels.forEach(labelObj => document.body.removeChild(labelObj.element));
     imagePlanes = [];
     labels = [];
-    movementAngles = [];
 }
 
 // ✅ Animation Function
@@ -180,30 +181,35 @@ function animate() {
                 plane.position.y += Math.sin(angle) * movementSpeed * directionY;
             }
 
-            // Wrap around edges
-            if (plane.position.x > window.innerWidth / 2) plane.position.x = -window.innerWidth / 2;
-            if (plane.position.x < -window.innerWidth / 2) plane.position.x = window.innerWidth / 2;
-            if (plane.position.y > window.innerHeight / 2) plane.position.y = -window.innerHeight / 2;
-            if (plane.position.y < -window.innerHeight / 2) plane.position.y = window.innerHeight / 2;
+            let halfWidth = window.innerWidth / 2;
+            let halfHeight = window.innerHeight / 2;
+
+            // ✅ Wrap images smoothly
+            if (plane.position.x > halfWidth) plane.position.x = -halfWidth;
+            if (plane.position.x < -halfWidth) plane.position.x = halfWidth;
+            if (plane.position.y > halfHeight) plane.position.y = -halfHeight;
+            if (plane.position.y < -halfHeight) plane.position.y = halfHeight;
         });
 
         updateLabels();
     }
-   
-    function toggleMovement() {
-    if (!movingX && !movingY) {
-        movingX = true;
-    } else if (movingX) {
-        movingX = false;
-        movingY = true;
-    } else {
-        movingY = false;
-    }
-}
 
     renderer.render(scene, camera);
 }
 
+// ✅ Toggle Movement (Stop → Move X → Move Y → Stop)
+function toggleMovement() {
+    if (!movingX && !movingY) {
+        movingX = true;
+        movingY = false;
+    } else if (movingX) {
+        movingX = false;
+        movingY = true;
+    } else {
+        movingX = false;
+        movingY = false;
+    }
+}
 
 // ✅ Keyboard Controls for Filtering
 window.addEventListener('keydown', (event) => {
@@ -214,7 +220,7 @@ window.addEventListener('keydown', (event) => {
         case '4': loadImages('Y4S1'); break;
         case 'r': loadImages(); break; // 🔥 Randomize images
         case 'b': location.reload(); break; // 🔥 Restart
-        case 'x': movingX = !movingX; movingY = false; break; // 🔥 Toggle movement modes
+        case 'x': toggleMovement(); break; // 🔥 Toggle movement
     }
 });
 

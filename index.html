@@ -7,14 +7,14 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r126/three.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background-color: white; overflow: hidden; font-family: 'Roboto Mono', monospace; }
+        body { background-color: rgb(0, 0, 0); overflow: hidden; font-family: 'Roboto Mono', monospace; }
         canvas { display: block; }
         .controls {
             position: fixed;
             bottom: 10px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(43, 19, 255, 0.349);
             color: white;
             padding: 10px;
             font-size: 12px;
@@ -23,7 +23,7 @@
             gap: 10px;
         }
         .control-button {
-            background: #333;
+            background: #0004ff56;
             color: white;
             border: none;
             padding: 5px 10px;
@@ -31,13 +31,13 @@
             cursor: pointer;
             border-radius: 5px;
         }
-        .control-button:hover { background: #555; }
+        .control-button:hover { background: #0000005d; }
         .image-label {
             position: absolute;
-            color: white;
+            color: rgb(255, 0, 242);
             font-family: 'Arial', sans-serif;
             font-size: 14px;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(255, 255, 255, 0);
             padding: 4px 8px;
             border-radius: 5px;
             pointer-events: none;
@@ -51,8 +51,7 @@
         <button class="control-button" onclick="loadImages('Y2S1')">Y2S1 (2)</button>
         <button class="control-button" onclick="loadImages('Y3S1')">Y3S1 (3)</button>
         <button class="control-button" onclick="loadImages('Y4S1')">Y4S1 (4)</button>
-        <button class="control-button" onclick="moving = !moving">Move/Stop (X)</button>
-        <button class="control-button" onclick="toggleMovement()">Move/Stop (X)</button>
+        <button class="control-button" onclick="toggleMovement()">Move/Stop (x)</button>
         <button class="control-button" onclick="loadImages()">Random (R)</button>
     </div>
     <script src="script.js"></script>
