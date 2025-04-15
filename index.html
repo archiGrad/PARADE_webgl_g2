@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script type="text/javascript" src="three.min.js"></script>
+    <script src="https://mrdoob.github.io/stats.js/build/stats.min.js"></script>
+    <script src="script.js" type="module"></script>
+    <title>Canvas QR Generator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background-color: white; overflow: hidden; font-family: 'Roboto Mono', monospace; }
+        canvas { display: block; }
+
+        .controls {
+            position: fixed;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            display: flex;
+            gap: 10px;
+            z-index: 10;
+        }
+
+        .control-button {
+            background: #333;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .control-button:hover { background: #666; }
+
+        #qrCodeContainer {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: white;
+            color: black;
+            padding: 10px;
+            border-radius: 6px;
+            z-index: 100;
+            display: none;
+            max-width: 240px;
+        }
+        .control-button:hover { background: #555; }
+        .image-label {
+            position: absolute;
+            font-size: 14px;
+            color: green;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="logo_container">
+        <span id="logo_title">ArchiGrad - <span id="logo_names"> Deniz Guvendi & Joris Putteneers </span></span><br>
+        <span id="logo_game">1</span><br>
+        <span id="logo_controls">Press ↓ three times to generate QR. Arrow keys for controls.</span>
+    </div>
+
+    <div class="controls">
+        <button class="control-button" onclick="loadImages('Y1S1')">Y1S1 (1)</button>
+        <button class="control-button" onclick="loadImages('Y2S1')">Y2S1 (2)</button>
+        <button class="control-button" onclick="loadImages('Y3S1')">Y3S1 (3)</button>
+        <button class="control-button" onclick="loadImages('Y4S1')">Y4S1 (4)</button>
+        <button class="control-button" onclick="moving = !moving">Move/Stop (X)</button>
+        <button class="control-button" onclick="loadImages()">Random (R)</button>
+    </div>
+
+    <div id="loadingOverlay">Loading...</div>
+
+    <script src="script.js"></script>
+</body>
+</html>
