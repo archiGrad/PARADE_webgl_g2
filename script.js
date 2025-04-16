@@ -18,20 +18,13 @@ window.addEventListener('load', () => {
     document.getElementById('loadingOverlay').style.display = 'none';
 });
 
-// ✅ FPS Stats
-var stats = new Stats();
-stats.showPanel(0);
-document.body.appendChild(stats.dom);
-stats.dom.style.position = 'absolute';
-stats.dom.style.left = '0px';
-stats.dom.style.top = '0px';
-
 // ✅ Fetch Images
 async function fetchImages() {
     try {
         const res = await fetch('/images.json');
         totalImages = await res.json();
         loadImages(categories[currentCategoryIndex]);
+        // console.log(totalImages)
     } catch (err) {
         console.error('Failed to fetch images.json:', err);
     }
@@ -49,7 +42,9 @@ function loadImages(category = '') {
 
     selected.forEach((filename) => {
         const tex = textureLoader.load(`data/${filename}`);
-        const geo = new THREE.PlaneGeometry(200, 200);
+        console.log(filename)
+        let randomwidth = Math.random() * (250 - 50) + 50;
+        const geo = new THREE.PlaneGeometry(randomwidth, randomwidth);
         const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
         const plane = new THREE.Mesh(geo, mat);
 
@@ -94,7 +89,7 @@ function updateLabels() {
         element.style.position = 'absolute';
         element.style.pointerEvents = 'none';
         element.style.transform = 'translate(-50%, -10px)';
-        element.style.color = 'limegreen';
+        element.style.color = 'cyan';
         element.style.fontSize = '12px';
     });
 }
@@ -112,7 +107,6 @@ function clearScene() {
 // ✅ Animate with Trails
 function animate() {
     requestAnimationFrame(animate);
-    stats.begin();
 
     imagePlanes.forEach((plane, i) => {
         const { angle, dx, dy } = movementAngles[i];
@@ -135,7 +129,6 @@ function animate() {
     updateLabels();
     renderer.clearDepth();
     renderer.render(scene, camera);
-    stats.end();
 }
 
 // ✅ Init Scene
@@ -174,42 +167,30 @@ window.addEventListener('keydown', (e) => {
             movingY = false;
         }
     } else if (e.key === 'ArrowLeft') {
-        qrDownCount++;
-        if (qrDownTimer) clearTimeout(qrDownTimer);
-        qrDownTimer = setTimeout(() => qrDownCount = 0, 3000);
-
-        if (qrDownCount >= 3) {
-            captureCanvasToQR();
-            qrDownCount = 0;
-        }
+        handleQRPress();
     } else if (e.key === 'ArrowRight') {
         currentCategoryIndex = (currentCategoryIndex + 1) % categories.length;
         loadImages(categories[currentCategoryIndex]);
+    } else if (e.key === 'r') {
+        sortAndReloadImages('r');
+    } else if (e.key === 'g') {
+        sortAndReloadImages('g');
+    } else if (e.key === 'b') {
+        sortAndReloadImages('b');
+    } else if (e.key === 'l') {
+        sortAndReloadImages('luminance');
     }
 });
 
 // ✅ UI Buttons
-if (document.getElementById('moveBtn')) {
-    document.getElementById('moveBtn').onclick = () => {
-        if (!movingX && !movingY) {
-            movingX = true;
-        } else if (movingX) {
-            movingX = false;
-            movingY = true;
-        } else {
-            movingX = false;
-            movingY = false;
-        }
-    };
-}
+['r', 'g', 'b', 'l'].forEach(k => {
+    const btn = document.getElementById(`sort-${k}`);
+    if (btn) btn.onclick = () => sortAndReloadImages(k === 'l' ? 'luminance' : k);
+});
+
+// ✅ QR Button
 if (document.getElementById('leftBtn')) {
     document.getElementById('leftBtn').onclick = () => handleQRPress();
-}
-if (document.getElementById('rightBtn')) {
-    document.getElementById('rightBtn').onclick = () => {
-        currentCategoryIndex = (currentCategoryIndex + 1) % categories.length;
-        loadImages(categories[currentCategoryIndex]);
-    };
 }
 
 // ✅ QR Functions
@@ -219,7 +200,7 @@ function handleQRPress() {
 
     qrDownTimer = setTimeout(() => qrDownCount = 0, 3000);
 
-    if (qrDownCount >= 3) {
+    if (qrDownCount >= 2) {
         captureCanvasToQR();
         qrDownCount = 0;
     }
@@ -237,7 +218,7 @@ function captureCanvasToQR(retryCount = 0) {
     }
 
     const dataURL = canvas.toDataURL('image/jpeg', 0.7);
-
+    
     fetch('/generate-qr', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -261,11 +242,52 @@ function captureCanvasToQR(retryCount = 0) {
 function showQR(qrURL, linkURL) {
     const qrContainer = document.getElementById('qrCodeContainer');
     const qrContent = document.getElementById('qrContent');
-    qrContent.innerHTML = `
-        <img src="${qrURL}" style="max-width: 200px; margin-bottom: 10px;" />
-        <br><a href="${linkURL}" target="_blank">${linkURL}</a>
-    `;
+
+    qrContent.innerHTML = `<img src="${qrURL}" />`;
     qrContainer.style.display = 'block';
+
+    setTimeout(() => {
+        qrContent.innerHTML = '';
+        qrContainer.style.display = 'none';
+    }, 7000);
 }
+
+function sortAndReloadImages(metric) {
+    const category = categories[currentCategoryIndex];
+fetch(`/sorted-images?metric=${metric}&category=${category}`)
+
+        .then(res => res.json())
+        .then(sortedList => {
+            clearScene();
+            sortedList.slice(0, maxImages).forEach(filename => {
+                const tex = textureLoader.load(`data/${filename}`);
+                let randomwidth = Math.random() * (250 - 50) + 50;
+                const geo = new THREE.PlaneGeometry(randomwidth, randomwidth);
+                const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+                const plane = new THREE.Mesh(geo, mat);
+
+                plane.position.set(
+                    (Math.random() - 0.5) * window.innerWidth,
+                    (Math.random() - 0.5) * window.innerHeight,
+                    0
+                );
+
+                movementAngles.push({
+                    angle: Math.random() * Math.PI * 2,
+                    dx: Math.random() > 0.5 ? 1 : -1,
+                    dy: Math.random() > 0.5 ? 1 : -1
+                });
+
+                scene.add(plane);
+                imagePlanes.push(plane);
+                createLabel(filename, plane);
+            });
+            updateLabels();
+        })
+        .catch(err => {
+            console.error('Failed to fetch sorted images:', err);
+        });
+}
+
 
 init();
