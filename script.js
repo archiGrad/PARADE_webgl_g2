@@ -20,6 +20,12 @@ function debugLog(message, data) {
     if (data !== undefined) {
         console.log(data);
     }
+    
+    // Update debug panel with basic stats if it exists
+    const debugInfo = document.getElementById('debugInfo');
+    if (debugInfo) {
+        debugInfo.textContent = `Images: ${imagePlanes.length} | Category: ${categories[currentCategoryIndex]}`;
+    }
 }
 
 // ✅ Loading Overlay
@@ -32,6 +38,7 @@ window.addEventListener('load', () => {
 async function fetchImages() {
     try {
         debugLog('Fetching images.json...');
+        // Use the specific route endpoint instead of the file path
         const res = await fetch('/images.json');
         
         if (!res.ok) {
@@ -107,6 +114,12 @@ function loadImages(category = '') {
     });
 
     updateLabels();
+    
+    // Update category indicator if it exists
+    const categoryIndicator = document.getElementById('categoryIndicator');
+    if (categoryIndicator) {
+        categoryIndicator.textContent = category || 'All Images';
+    }
 }
 
 // ✅ Create Label
@@ -195,6 +208,12 @@ function init() {
     fetchImages();
     animate();
     
+    // Configure debug panel
+    const debugPanel = document.getElementById('debugPanel');
+    if (debugPanel) {
+        debugPanel.style.display = 'none'; // Change to 'block' to show debug panel
+    }
+    
     // Handle window resize
     window.addEventListener('resize', () => {
         debugLog('Window resized, updating camera and renderer');
@@ -239,6 +258,13 @@ window.addEventListener('keydown', (e) => {
         sortAndReloadImages('b');
     } else if (e.key === 'l') {
         sortAndReloadImages('luminance');
+    } else if (e.key === 'd') {
+        // Toggle debug panel
+        const debugPanel = document.getElementById('debugPanel');
+        if (debugPanel) {
+            debugPanel.style.display = debugPanel.style.display === 'none' ? 'block' : 'none';
+            debugLog(`Debug panel ${debugPanel.style.display === 'none' ? 'hidden' : 'visible'}`);
+        }
     }
 });
 
@@ -337,7 +363,7 @@ function sortAndReloadImages(metric) {
     
     debugLog(`Sorting images by ${metric} in category ${category}`);
     
-    // Fix the line break issue in the fetch URL
+    // Fixed fetch URL with no line break
     fetch(`/sorted-images?metric=${metric}&category=${category}`)
         .then(res => {
             if (!res.ok) {
@@ -389,6 +415,13 @@ function sortAndReloadImages(metric) {
             });
             
             updateLabels();
+            
+            // Update category indicator after sorting
+            const categoryIndicator = document.getElementById('categoryIndicator');
+            if (categoryIndicator) {
+                categoryIndicator.textContent = `${category} (Sorted by ${metric})`;
+            }
+            
             debugLog(`Finished loading ${Math.min(sortedList.length, maxImages)} sorted images`);
         })
         .catch(err => {
