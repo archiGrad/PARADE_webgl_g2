@@ -2,8 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Image Viewer</title>
     <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+        }
+        
         .sort-buttons {
             position: fixed;
             top: 10px;
@@ -12,12 +19,21 @@
             gap: 8px;
             z-index: 10;
         }
-
+        
         .sort-buttons button {
             padding: 5px 10px;
             font-size: 14px;
+            cursor: pointer;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: 1px solid cyan;
+            border-radius: 4px;
         }
-
+        
+        .sort-buttons button:hover {
+            background-color: rgba(0, 0, 0, 0.9);
+        }
+        
         #qrCodeContainer {
             position: fixed;
             top: 20px;
@@ -27,16 +43,18 @@
             padding: 10px;
             display: none;
             border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
         }
-
+        
         .image-label {
             position: absolute;
             font-size: 12px;
-            color: limegreen;
+            color: cyan;
             pointer-events: none;
             transform: translate(-50%, -10px);
+            text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.7);
         }
-
+        
         #loadingOverlay {
             position: fixed;
             inset: 0;
@@ -48,26 +66,57 @@
             font-size: 2em;
             z-index: 1000;
         }
+        
+        #debugPanel {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 100;
+            display: none;
+        }
+        
+        #categoryIndicator {
+            position: fixed;
+            top: 50px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: cyan;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            z-index: 90;
+        }
     </style>
 </head>
 <body>
-
-<div id="loadingOverlay">Loading...</div>
-
-<div class="sort-buttons">
-    <button id="sort-r">Sort R</button>
-    <button id="sort-g">Sort G</button>
-    <button id="sort-b">Sort B</button>
-    <button id="sort-l">Sort L</button>
-</div>
-
-<div id="qrCodeContainer">
-    <div id="qrContent"></div>
-</div>
-
-<!-- Required Scripts -->
-<script src="three.min.js"></script>
-<script src="script.js"></script>
-
+    <div id="loadingOverlay">Loading...</div>
+    
+    <div class="sort-buttons">
+        <button id="sort-r">Sort R</button>
+        <button id="sort-g">Sort G</button>
+        <button id="sort-b">Sort B</button>
+        <button id="sort-l">Sort L</button>
+        <button id="leftBtn">QR</button>
+    </div>
+    
+    <div id="categoryIndicator"></div>
+    
+    <div id="qrCodeContainer">
+        <div id="qrContent"></div>
+    </div>
+    
+    <div id="debugPanel">
+        <div id="debugInfo">Images: 0 | Category: none</div>
+    </div>
+    
+    <!-- Required Scripts -->
+    <script src="three.min.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
