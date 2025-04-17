@@ -13,36 +13,77 @@ let movingY = false;
 
 const categories = ['Y1S1', 'Y2S1', 'Y3S1', 'Y4S1'];
 
+// ✅ Debug Logging
+function debugLog(message, data) {
+    const timestamp = new Date().toISOString().substr(11, 8);
+    console.log(`[${timestamp}] ${message}`);
+    if (data !== undefined) {
+        console.log(data);
+    }
+}
+
 // ✅ Loading Overlay
 window.addEventListener('load', () => {
     document.getElementById('loadingOverlay').style.display = 'none';
+    debugLog('Page loaded, hiding loading overlay');
 });
 
 // ✅ Fetch Images
 async function fetchImages() {
     try {
+        debugLog('Fetching images.json...');
         const res = await fetch('/images.json');
+        
+        if (!res.ok) {
+            throw new Error(`Failed to fetch images.json: ${res.status} ${res.statusText}`);
+        }
+        
         totalImages = await res.json();
+        debugLog(`Loaded ${totalImages.length} images from images.json`);
+        
+        // Validate the response
+        if (!Array.isArray(totalImages)) {
+            throw new Error('images.json did not return an array');
+        }
+        
         loadImages(categories[currentCategoryIndex]);
-        // console.log(totalImages)
     } catch (err) {
         console.error('Failed to fetch images.json:', err);
+        alert('Failed to load images. Check console for details.');
     }
 }
 
 // ✅ Load and Display Images
 function loadImages(category = '') {
+    debugLog(`Loading images for category: ${category}`);
     clearScene();
 
     const filtered = category
         ? totalImages.filter(name => name.includes(category))
         : totalImages;
+    
+    debugLog(`Filtered ${filtered.length} images matching category "${category}"`);
+
+    if (filtered.length === 0) {
+        debugLog(`WARNING: No images found for category "${category}"`);
+        return;
+    }
 
     const selected = filtered.sort(() => 0.5 - Math.random()).slice(0, maxImages);
+    debugLog(`Selected ${selected.length} random images to display`);
 
     selected.forEach((filename) => {
-        const tex = textureLoader.load(`data/${filename}`);
-        console.log(filename)
+        debugLog(`Loading texture: ${filename}`);
+        const tex = textureLoader.load(
+            `data/${filename}`,
+            // Success callback
+            () => debugLog(`Loaded texture: ${filename}`),
+            // Progress callback
+            undefined,
+            // Error callback
+            (err) => console.error(`Failed to load texture: ${filename}`, err)
+        );
+        
         let randomwidth = Math.random() * (250 - 50) + 50;
         const geo = new THREE.PlaneGeometry(randomwidth, randomwidth);
         const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
@@ -96,6 +137,8 @@ function updateLabels() {
 
 // ✅ Clear Scene
 function clearScene() {
+    debugLog(`Clearing scene: removing ${imagePlanes.length} planes and ${labels.length} labels`);
+    
     imagePlanes.forEach(p => scene.remove(p));
     imagePlanes = [];
     movementAngles = [];
@@ -133,6 +176,8 @@ function animate() {
 
 // ✅ Init Scene
 function init() {
+    debugLog('Initializing scene');
+    
     scene = new THREE.Scene();
     camera = new THREE.OrthographicCamera(
         window.innerWidth / -2, window.innerWidth / 2,
@@ -149,6 +194,17 @@ function init() {
 
     fetchImages();
     animate();
+    
+    // Handle window resize
+    window.addEventListener('resize', () => {
+        debugLog('Window resized, updating camera and renderer');
+        camera.left = window.innerWidth / -2;
+        camera.right = window.innerWidth / 2;
+        camera.top = window.innerHeight / 2;
+        camera.bottom = window.innerHeight / -2;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
 }
 
 // ✅ Keyboard Events
@@ -159,17 +215,21 @@ window.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowDown') {
         if (!movingX && !movingY) {
             movingX = true;
+            debugLog('Movement: X enabled');
         } else if (movingX) {
             movingX = false;
             movingY = true;
+            debugLog('Movement: Y enabled');
         } else {
             movingX = false;
             movingY = false;
+            debugLog('Movement: disabled');
         }
     } else if (e.key === 'ArrowLeft') {
         handleQRPress();
     } else if (e.key === 'ArrowRight') {
         currentCategoryIndex = (currentCategoryIndex + 1) % categories.length;
+        debugLog(`Switching to category: ${categories[currentCategoryIndex]}`);
         loadImages(categories[currentCategoryIndex]);
     } else if (e.key === 'r') {
         sortAndReloadImages('r');
@@ -185,17 +245,23 @@ window.addEventListener('keydown', (e) => {
 // ✅ UI Buttons
 ['r', 'g', 'b', 'l'].forEach(k => {
     const btn = document.getElementById(`sort-${k}`);
-    if (btn) btn.onclick = () => sortAndReloadImages(k === 'l' ? 'luminance' : k);
+    if (btn) {
+        btn.onclick = () => sortAndReloadImages(k === 'l' ? 'luminance' : k);
+        debugLog(`Registered click handler for sort-${k} button`);
+    }
 });
 
 // ✅ QR Button
 if (document.getElementById('leftBtn')) {
     document.getElementById('leftBtn').onclick = () => handleQRPress();
+    debugLog('Registered click handler for leftBtn (QR)');
 }
 
 // ✅ QR Functions
 function handleQRPress() {
     qrDownCount++;
+    debugLog(`QR button press count: ${qrDownCount}`);
+    
     if (qrDownTimer) clearTimeout(qrDownTimer);
 
     qrDownTimer = setTimeout(() => qrDownCount = 0, 3000);
@@ -207,9 +273,12 @@ function handleQRPress() {
 }
 
 function captureCanvasToQR(retryCount = 0) {
+    debugLog('Capturing canvas for QR code generation');
+    
     const canvas = document.querySelector('canvas');
     if (!canvas) {
         if (retryCount < 5) {
+            debugLog(`Canvas not found, retrying (${retryCount + 1}/5)...`);
             setTimeout(() => captureCanvasToQR(retryCount + 1), 300);
         } else {
             alert("Canvas not found after multiple attempts!");
@@ -218,15 +287,22 @@ function captureCanvasToQR(retryCount = 0) {
     }
 
     const dataURL = canvas.toDataURL('image/jpeg', 0.7);
+    debugLog('Canvas captured, sending to server');
     
     fetch('/generate-qr', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: `image_data=${encodeURIComponent(dataURL)}`
     })
-    .then(res => res.json())
+    .then(res => {
+        if (!res.ok) {
+            throw new Error(`Server responded with status: ${res.status}`);
+        }
+        return res.json();
+    })
     .then(data => {
         if (data.success) {
+            debugLog('QR code generated successfully');
             showQR(data.qr_code, data.original_image);
         } else {
             console.error('QR generation failed:', data.error);
@@ -240,6 +316,8 @@ function captureCanvasToQR(retryCount = 0) {
 }
 
 function showQR(qrURL, linkURL) {
+    debugLog(`Showing QR code: ${qrURL} (links to ${linkURL})`);
+    
     const qrContainer = document.getElementById('qrCodeContainer');
     const qrContent = document.getElementById('qrContent');
 
@@ -247,20 +325,47 @@ function showQR(qrURL, linkURL) {
     qrContainer.style.display = 'block';
 
     setTimeout(() => {
+        debugLog('QR code display timeout reached, hiding');
         qrContent.innerHTML = '';
         qrContainer.style.display = 'none';
     }, 7000);
 }
 
+// ✅ Sort and Reload Images (fixed)
 function sortAndReloadImages(metric) {
     const category = categories[currentCategoryIndex];
-fetch(`/sorted-images?metric=${metric}&category=${category}`)
-
-        .then(res => res.json())
+    
+    debugLog(`Sorting images by ${metric} in category ${category}`);
+    
+    // Fix the line break issue in the fetch URL
+    fetch(`/sorted-images?metric=${metric}&category=${category}`)
+        .then(res => {
+            if (!res.ok) {
+                throw new Error(`Server responded with status: ${res.status}`);
+            }
+            return res.json();
+        })
         .then(sortedList => {
+            debugLog(`Received ${sortedList.length} sorted images from server`);
+            
+            if (sortedList.length === 0) {
+                debugLog('WARNING: No images returned from sorting');
+                return;
+            }
+            
             clearScene();
+            
             sortedList.slice(0, maxImages).forEach(filename => {
-                const tex = textureLoader.load(`data/${filename}`);
+                const tex = textureLoader.load(
+                    `data/${filename}`,
+                    // Success callback
+                    () => debugLog(`Loaded sorted texture: ${filename}`),
+                    // Progress callback
+                    undefined,
+                    // Error callback
+                    (err) => console.error(`Error loading sorted texture ${filename}:`, err)
+                );
+                
                 let randomwidth = Math.random() * (250 - 50) + 50;
                 const geo = new THREE.PlaneGeometry(randomwidth, randomwidth);
                 const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
@@ -282,12 +387,15 @@ fetch(`/sorted-images?metric=${metric}&category=${category}`)
                 imagePlanes.push(plane);
                 createLabel(filename, plane);
             });
+            
             updateLabels();
+            debugLog(`Finished loading ${Math.min(sortedList.length, maxImages)} sorted images`);
         })
         .catch(err => {
-            console.error('Failed to fetch sorted images:', err);
+            console.error('Failed to fetch or display sorted images:', err);
+            alert('Error sorting images. Check console for details.');
         });
 }
 
-
+// Initialize the application
 init();
