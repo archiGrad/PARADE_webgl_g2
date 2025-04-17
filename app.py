@@ -1,412 +1,196 @@
-// ✅ Core Setup
-let scene, camera, renderer;
-let textureLoader = new THREE.TextureLoader();
-let imagePlanes = [];
-let movementAngles = [];
-let totalImages = [];
-let labels = [];
-let currentCategoryIndex = 0;
-let maxImages = 50;
-let movementSpeed = 1.2;
-let movingX = false;
-let movingY = false;
+from flask import Flask, request, jsonify, send_from_directory
+import os
+import requests
+import base64
+import qrcode
+import time
+from werkzeug.middleware.proxy_fix import ProxyFix
+from PIL import Image
+import numpy as np
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
-const categories = ['Y1S1', 'Y2S1', 'Y3S1', 'Y4S1'];
 
-// ✅ Loading Overlay
-window.addEventListener('load', () => {
-    document.getElementById('loadingOverlay').style.display = 'none';
-});
+app = Flask(__name__, static_url_path='', static_folder='.')
+app.wsgi_app = ProxyFix(app.wsgi_app)
 
-// Debug logging with timestamp
-function debugLog(message, data) {
-    const timestamp = new Date().toISOString().substr(11, 8);
-    console.log(`[${timestamp}] ${message}`);
-    if (data !== undefined) {
-        console.log(data);
-    }
-}
+app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024  # 32MB upload limit
 
-// Check if images.json was loaded correctly
-function validateImageData() {
-    debugLog(`Total images in memory: ${totalImages.length}`);
-    if (totalImages.length === 0) {
-        debugLog('WARNING: No images loaded');
-        return false;
-    }
-    
-    // Check for current category
-    const currentCategory = categories[currentCategoryIndex];
-    const matchingImages = totalImages.filter(name => name.includes(currentCategory));
-    debugLog(`Images matching category '${currentCategory}': ${matchingImages.length}`);
-    
-    return true;
-}
+UPLOAD_FOLDER = 'uploads'
+QR_FOLDER = 'static/qrcodes'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(QR_FOLDER, exist_ok=True)
 
-// ✅ Fetch Images
-async function fetchImages() {
-    try {
-        debugLog('Fetching images.json...');
-        const res = await fetch('/images.json');
+@app.route('/')
+def index():
+    return send_from_directory('.', 'index.html')
+
+@app.route('/images.json')
+def serve_images_json():
+    app.logger.info('Serving images.json file')
+    # Check if file exists
+    if os.path.exists('images.json'):
+        return send_from_directory('.', 'images.json')
+    else:
+        # If file doesn't exist, generate it
+        app.logger.warning('images.json not found, generating dynamically')
+        data_folder = 'data'
+        image_files = []
         
-        if (!res.ok) {
-            throw new Error(`Failed to fetch images.json: ${res.status} ${res.statusText}`);
-        }
+        if os.path.exists(data_folder):
+            image_files = [f for f in os.listdir(data_folder) 
+                          if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+            app.logger.info(f'Found {len(image_files)} images in data folder')
+        else:
+            app.logger.error(f'Data folder "{data_folder}" not found')
         
-        totalImages = await res.json();
-        debugLog(`Loaded ${totalImages.length} images from images.json`);
-        
-        // Validate the response
-        if (!Array.isArray(totalImages)) {
-            throw new Error('images.json did not return an array');
-        }
-        
-        loadImages(categories[currentCategoryIndex]);
-    } catch (err) {
-        console.error('Failed to fetch images.json:', err);
-        alert('Failed to load images. Check console for details.');
-    }
-}
+        return jsonify(image_files)
 
-// ✅ Load and Display Images
-function loadImages(category = '') {
-    debugLog(`Loading images for category: ${category}`);
-    clearScene();
+@app.route('/data/<path:filename>')
+def serve_data(filename):
+    return send_from_directory('data', filename)
 
-    const filtered = category
-        ? totalImages.filter(name => name.includes(category))
-        : totalImages;
+@app.route('/sorted-images')
+def sorted_images():
+    metric = request.args.get('metric', 'luminance')
+    category = request.args.get('category', '')
     
-    debugLog(`Filtered ${filtered.length} images matching category "${category}"`);
-
-    if (filtered.length === 0) {
-        debugLog(`WARNING: No images found for category "${category}"`);
-        return;
-    }
-
-    const selected = filtered.sort(() => 0.5 - Math.random()).slice(0, maxImages);
-    debugLog(`Selected ${selected.length} random images to display`);
-
-    selected.forEach((filename) => {
-        const tex = textureLoader.load(
-            `data/${filename}`,
-            // Success callback
-            () => debugLog(`Loaded texture: ${filename}`),
-            // Progress callback
-            undefined,
-            // Error callback
-            (err) => console.error(`Failed to load texture: ${filename}`, err)
-        );
-        
-        let randomwidth = Math.random() * (250 - 50) + 50;
-        const geo = new THREE.PlaneGeometry(randomwidth, randomwidth);
-        const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
-        const plane = new THREE.Mesh(geo, mat);
-
-        plane.position.set(
-            (Math.random() - 0.5) * window.innerWidth,
-            (Math.random() - 0.5) * window.innerHeight,
-            0
-        );
-
-        movementAngles.push({
-            angle: Math.random() * Math.PI * 2,
-            dx: Math.random() > 0.5 ? 1 : -1,
-            dy: Math.random() > 0.5 ? 1 : -1
-        });
-
-        scene.add(plane);
-        imagePlanes.push(plane);
-        createLabel(filename, plane);
-    });
-
-    updateLabels();
-}
-
-// ✅ Create Label
-function createLabel(filename, plane) {
-    const label = document.createElement('div');
-    label.className = 'image-label';
-    label.innerText = filename;
-    document.body.appendChild(label);
-    labels.push({ element: label, plane });
-}
-
-// ✅ Update Label Positions
-function updateLabels() {
-    labels.forEach(({ element, plane }) => {
-        const screenPos = plane.position.clone().project(camera);
-        const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
-        const y = (1 - (screenPos.y * 0.5 + 0.5)) * window.innerHeight;
-
-        element.style.left = `${x}px`;
-        element.style.top = `${y}px`;
-        element.style.position = 'absolute';
-        element.style.pointerEvents = 'none';
-        element.style.transform = 'translate(-50%, -10px)';
-        element.style.color = 'cyan';
-        element.style.fontSize = '12px';
-    });
-}
-
-// ✅ Clear Scene
-function clearScene() {
-    debugLog(`Clearing scene: removing ${imagePlanes.length} planes and ${labels.length} labels`);
+    app.logger.info(f'Sorting images by {metric} in category {category}')
     
-    imagePlanes.forEach(p => scene.remove(p));
-    imagePlanes = [];
-    movementAngles = [];
-
-    labels.forEach(({ element }) => element.remove());
-    labels = [];
-}
-
-// ✅ Animate with Trails
-function animate() {
-    requestAnimationFrame(animate);
-
-    imagePlanes.forEach((plane, i) => {
-        const { angle, dx, dy } = movementAngles[i];
-
-        if (movingX) {
-            plane.position.x += Math.cos(angle) * movementSpeed * dx;
-        }
-        if (movingY) {
-            plane.position.y += Math.sin(angle) * movementSpeed * dy;
-        }
-
-        const w = window.innerWidth / 2;
-        const h = window.innerHeight / 2;
-        if (plane.position.x > w) plane.position.x = -w;
-        if (plane.position.x < -w) plane.position.x = w;
-        if (plane.position.y > h) plane.position.y = -h;
-        if (plane.position.y < -h) plane.position.y = h;
-    });
-
-    updateLabels();
-    renderer.clearDepth();
-    renderer.render(scene, camera);
-}
-
-// ✅ Init Scene
-function init() {
-    debugLog('Initializing scene');
+    data_folder = 'data'
+    image_scores = []
     
-    scene = new THREE.Scene();
-    camera = new THREE.OrthographicCamera(
-        window.innerWidth / -2, window.innerWidth / 2,
-        window.innerHeight / 2, window.innerHeight / -2,
-        -1000, 1000
-    );
-    camera.position.z = 1;
-
-    renderer = new THREE.WebGLRenderer({ preserveDrawingBuffer: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setClearColor(0x000000, 1);
-    renderer.autoClear = false;
-    document.body.appendChild(renderer.domElement);
-
-    fetchImages();
-    animate();
+    # Check if the data folder exists
+    if not os.path.exists(data_folder):
+        app.logger.error(f"Data folder '{data_folder}' does not exist")
+        return jsonify({'error': 'Data folder not found'}), 500
     
-    // Handle window resize
-    window.addEventListener('resize', () => {
-        camera.left = window.innerWidth / -2;
-        camera.right = window.innerWidth / 2;
-        camera.top = window.innerHeight / 2;
-        camera.bottom = window.innerHeight / -2;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    });
-}
-
-// ✅ Keyboard Events
-let qrDownCount = 0;
-let qrDownTimer = null;
-
-window.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowDown') {
-        if (!movingX && !movingY) {
-            movingX = true;
-            debugLog('Movement: X enabled');
-        } else if (movingX) {
-            movingX = false;
-            movingY = true;
-            debugLog('Movement: Y enabled');
-        } else {
-            movingX = false;
-            movingY = false;
-            debugLog('Movement: disabled');
-        }
-    } else if (e.key === 'ArrowLeft') {
-        handleQRPress();
-    } else if (e.key === 'ArrowRight') {
-        currentCategoryIndex = (currentCategoryIndex + 1) % categories.length;
-        debugLog(`Switching to category: ${categories[currentCategoryIndex]}`);
-        loadImages(categories[currentCategoryIndex]);
-    } else if (e.key === 'r') {
-        sortAndReloadImages('r');
-    } else if (e.key === 'g') {
-        sortAndReloadImages('g');
-    } else if (e.key === 'b') {
-        sortAndReloadImages('b');
-    } else if (e.key === 'l') {
-        sortAndReloadImages('luminance');
-    }
-});
-
-// ✅ UI Buttons
-['r', 'g', 'b', 'l'].forEach(k => {
-    const btn = document.getElementById(`sort-${k}`);
-    if (btn) btn.onclick = () => sortAndReloadImages(k === 'l' ? 'luminance' : k);
-});
-
-// ✅ QR Button
-if (document.getElementById('leftBtn')) {
-    document.getElementById('leftBtn').onclick = () => handleQRPress();
-}
-
-// ✅ QR Functions
-function handleQRPress() {
-    qrDownCount++;
-    debugLog(`QR button press count: ${qrDownCount}`);
+    # Get a list of all image files in the folder
+    all_files = [f for f in os.listdir(data_folder) 
+                if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
     
-    if (qrDownTimer) clearTimeout(qrDownTimer);
-
-    qrDownTimer = setTimeout(() => qrDownCount = 0, 3000);
-
-    if (qrDownCount >= 2) {
-        captureCanvasToQR();
-        qrDownCount = 0;
-    }
-}
-
-function captureCanvasToQR(retryCount = 0) {
-    debugLog('Capturing canvas for QR code');
+    # Filter files by category if needed
+    filtered_files = [f for f in all_files if category in f]
     
-    const canvas = document.querySelector('canvas');
-    if (!canvas) {
-        if (retryCount < 5) {
-            debugLog(`Canvas not found, retrying (${retryCount + 1}/5)...`);
-            setTimeout(() => captureCanvasToQR(retryCount + 1), 300);
-        } else {
-            alert("Canvas not found after multiple attempts!");
-        }
-        return;
-    }
-
-    const dataURL = canvas.toDataURL('image/jpeg', 0.7);
-    debugLog('Canvas captured, sending to server');
+    app.logger.info(f'Found {len(filtered_files)} images matching category "{category}"')
     
-    fetch('/generate-qr', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `image_data=${encodeURIComponent(dataURL)}`
-    })
-    .then(res => {
-        if (!res.ok) {
-            throw new Error(`Server responded with status: ${res.status}`);
-        }
-        return res.json();
-    })
-    .then(data => {
-        if (data.success) {
-            debugLog('QR code generated successfully');
-            showQR(data.qr_code, data.original_image);
-        } else {
-            console.error('QR generation failed:', data.error);
-            alert('QR generation failed: ' + data.error);
-        }
-    })
-    .catch(err => {
-        console.error('QR fetch error:', err);
-        alert('QR upload error');
-    });
-}
-
-function showQR(qrURL, linkURL) {
-    debugLog(`Showing QR code: ${qrURL} (links to ${linkURL})`);
+    for filename in filtered_files:
+        try:
+            file_path = os.path.join(data_folder, filename)
+            with Image.open(file_path) as img:
+                img = img.convert('RGB')
+                np_img = np.array(img)
+                
+                if np_img.ndim != 3:
+                    app.logger.warning(f"Skipping {filename}: Not a valid RGB image")
+                    continue
+                
+                # Calculate average color
+                avg_color = np_img.mean(axis=(0, 1))
+                
+                # Determine score based on metric
+                if metric == 'r':
+                    score = avg_color[0]
+                elif metric == 'g':
+                    score = avg_color[1]
+                elif metric == 'b':
+                    score = avg_color[2]
+                else:  # luminance
+                    score = 0.2126 * avg_color[0] + 0.7152 * avg_color[1] + 0.0722 * avg_color[2]
+                
+                image_scores.append((filename, score))
+                
+        except Exception as e:
+            app.logger.warning(f"Error processing {filename}: {str(e)}")
     
-    const qrContainer = document.getElementById('qrCodeContainer');
-    const qrContent = document.getElementById('qrContent');
-
-    qrContent.innerHTML = `<img src="${qrURL}" />`;
-    qrContainer.style.display = 'block';
-
-    setTimeout(() => {
-        debugLog('QR code display timeout reached, hiding');
-        qrContent.innerHTML = '';
-        qrContainer.style.display = 'none';
-    }, 7000);
-}
-
-function sortAndReloadImages(metric) {
-    const category = categories[currentCategoryIndex];
+    # Check if we found any valid images
+    if not image_scores:
+        app.logger.warning("No valid images found for sorting")
+        return jsonify([]), 200
     
-    debugLog(`Sorting images by ${metric} in category ${category}`);
+    # Sort images by score (higher values first)
+    sorted_filenames = [fname for fname, _ in sorted(image_scores, key=lambda x: x[1], reverse=True)]
     
-    fetch(`/sorted-images?metric=${metric}&category=${category}`)
-        .then(res => {
-            if (!res.ok) {
-                throw new Error(`Server responded with status: ${res.status}`);
-            }
-            return res.json();
+    app.logger.info(f"Successfully sorted {len(sorted_filenames)} images")
+    return jsonify(sorted_filenames)
+
+@app.route('/generate-qr', methods=['POST'])
+def generate_qr():
+    try:
+        image_data = request.form.get('image_data')
+        if not image_data:
+            app.logger.warning('⚠️ No image data received in request.')
+            return jsonify({'success': False, 'error': 'No image data provided'})
+
+        if 'data:image/' in image_data:
+            image_data = image_data.split(',')[1]  # Strip data URL header
+
+        timestamp = int(time.time())
+        image_filename = f'image_{timestamp}.png'
+        qr_filename = f'image_{timestamp}_qr.png'
+        image_path = os.path.join(UPLOAD_FOLDER, image_filename)
+
+        image_bytes = base64.b64decode(image_data)
+        with open(image_path, 'wb') as f:
+            f.write(image_bytes)
+
+        # Debugging logs
+        if not os.path.exists(image_path):
+            app.logger.error(f'❌ Image file {image_path} was not saved!')
+            return jsonify({'success': False, 'error': 'Image not saved'})
+
+        image_size = os.path.getsize(image_path)
+        app.logger.info(f'✅ Image saved: {image_path} ({image_size} bytes)')
+
+        if image_size < 100:
+            app.logger.warning('⚠️ Image size is suspiciously small — may be blank.')
+            return jsonify({'success': False, 'error': 'Saved image is too small or blank'})
+
+        # Upload to ImgBB
+        with open(image_path, 'rb') as f:
+            files = {'image': f}
+            imgbb_response = requests.post(
+                'https://api.imgbb.com/1/upload?key=a827f127d1a994df55b303b9ade745ad',
+                files=files
+            )
+
+        imgbb_data = imgbb_response.json()
+        if not imgbb_data.get('success'):
+            app.logger.error(f'❌ ImgBB upload failed: {imgbb_data}')
+            return jsonify({'success': False, 'error': 'Upload to ImgBB failed'})
+
+        image_url = imgbb_data['data']['image']['url']
+        app.logger.info(f'🌐 Image uploaded to ImgBB: {image_url}')
+
+        # Generate QR code
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(image_url)
+        qr.make(fit=True)
+        qr_img = qr.make_image(fill_color="black", back_color="white")
+
+        qr_path = os.path.join(QR_FOLDER, qr_filename)
+        qr_img.save(qr_path)
+
+        if os.path.exists(qr_path):
+            app.logger.info(f'✅ QR code saved at: {qr_path}')
+        else:
+            app.logger.error(f'❌ QR code was not saved properly at {qr_path}')
+
+        return jsonify({
+            'success': True,
+            'qr_code': f'/static/qrcodes/{qr_filename}',
+            'original_image': image_url
         })
-        .then(sortedList => {
-            debugLog(`Received ${sortedList.length} sorted images`);
-            
-            // Clear existing images
-            clearScene();
-            
-            if (sortedList.length === 0) {
-                console.warn('No images returned from the server');
-                return;
-            }
-            
-            // Load the sorted images
-            sortedList.slice(0, maxImages).forEach(filename => {
-                const tex = textureLoader.load(`data/${filename}`, 
-                    // Success callback
-                    function() {
-                        debugLog(`Successfully loaded texture: ${filename}`);
-                    },
-                    // Progress callback
-                    undefined,
-                    // Error callback
-                    function(err) {
-                        console.error(`Error loading texture ${filename}:`, err);
-                    }
-                );
-                
-                let randomwidth = Math.random() * (250 - 50) + 50;
-                const geo = new THREE.PlaneGeometry(randomwidth, randomwidth);
-                const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
-                const plane = new THREE.Mesh(geo, mat);
-                
-                plane.position.set(
-                    (Math.random() - 0.5) * window.innerWidth,
-                    (Math.random() - 0.5) * window.innerHeight,
-                    0
-                );
-                
-                movementAngles.push({
-                    angle: Math.random() * Math.PI * 2,
-                    dx: Math.random() > 0.5 ? 1 : -1,
-                    dy: Math.random() > 0.5 ? 1 : -1
-                });
-                
-                scene.add(plane);
-                imagePlanes.push(plane);
-                createLabel(filename, plane);
-            });
-            
-            updateLabels();
-        })
-        .catch(err => {
-            console.error('Failed to fetch or display sorted images:', err);
-            alert('Error sorting images. Check console for details.');
-        });
-}
 
-// Initialize the application
-init();
+    except Exception as e:
+        app.logger.exception('🔥 Exception during QR generation:')
+        return jsonify({'success': False, 'error': str(e)})
+
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5502)  # or any other unused port
